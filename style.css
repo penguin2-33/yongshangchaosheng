@@ -1,0 +1,430 @@
+/* 指尖绽放 · 甬上四季 —— 宣纸／淡墨／朱砂的克制版式
+ * 常驻文字只保留：标题、季节、花名、花语、印章。
+ * 操作说明只在进入页出现一次；演示模式只留花与题字。
+ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --paper: #f3ede1;              /* 宣纸底（与 canvas 同步，避免启动闪黑） */
+  --ink: #2e2923;                /* 淡墨 */
+  --ink-soft: rgba(46, 41, 35, 0.60);
+  --ink-faint: rgba(46, 41, 35, 0.36);
+  --ink-ghost: rgba(46, 41, 35, 0.13);
+  --cinnabar: #9e3b2c;           /* 朱砂 */
+  --season-accent: #8f4b47;      /* 由 app.js 随季节更新 */
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Songti SC", "STSong", "Noto Serif SC", "SimSun", serif;
+  user-select: none;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+}
+
+#stage { position: fixed; inset: 0; display: block; }
+
+.hidden { display: none !important; }
+
+/* ---------- 朱砂印：无发光、无描边，只像纸上的印泥 ---------- */
+.seal {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--cinnabar);
+  color: #f7eee2;
+  border-radius: 2px;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  line-height: 1.08;
+  text-align: center;
+  opacity: 0.92;
+  box-shadow: inset 0 0 0 1px rgba(255, 248, 238, 0.16);
+}
+.seal span { display: block; }
+.seal-small {
+  width: 21px; height: 21px;
+  font-size: 11px;
+  transform: rotate(1.2deg);
+  align-self: flex-end;
+}
+
+/* ---------- 左下标题：唯一的大字，字距松、留白足 ---------- */
+#titleBlock {
+  position: fixed;
+  left: clamp(28px, 4.4vw, 84px);
+  bottom: clamp(28px, 5.4vh, 64px);
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(12px, 1.1vw, 20px);
+  pointer-events: none;
+}
+h1 {
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: clamp(40px, 4.7vw, 78px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: 0.30em;
+  margin-right: -0.30em;        /* 抵消末字后的字距，左缘干净 */
+  color: var(--ink);
+}
+
+/* ---------- 右侧竖排题跋：花语在左，名号在右 ---------- */
+#inscription {
+  position: fixed;
+  right: clamp(26px, 3.8vw, 66px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: clamp(14px, 1.4vw, 24px);
+  pointer-events: none;
+}
+.insc-quote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+#flowerQuote {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif;
+  font-size: clamp(17px, 1.18vw, 21px);
+  letter-spacing: 0.40em;
+  line-height: 1.15;
+  color: var(--ink-soft);
+}
+.insc-name {
+  writing-mode: vertical-rl;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.season {
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: clamp(22px, 1.9vw, 30px);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--season-accent);
+  transition: color 0.9s ease;
+}
+#flowerNameZh {
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: clamp(24px, 1.7vw, 30px);
+  letter-spacing: 0.36em;
+  color: var(--ink);
+  transition: color 0.9s ease;
+}
+
+/* ---------- 声音：只露一个音符；悬停才出现说明 ---------- */
+#soundCtl {
+  position: fixed;
+  right: clamp(26px, 3.8vw, 66px);
+  bottom: calc(clamp(26px, 5.2vh, 58px) + 108px);
+  z-index: 4;
+  pointer-events: auto;
+}
+#soundBtn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 2px;
+  background: none; border: none;
+  color: var(--ink-faint);
+  font-family: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.3s, color 0.3s;
+}
+#soundBtn:hover { opacity: 0.95; }
+#soundBtn.muted { color: var(--cinnabar); opacity: 0.9; }
+#muteGlyph {
+  font-size: 15px;
+  line-height: 1;
+  font-family: "Songti SC", serif;
+}
+.sound-label {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  opacity: 0;
+  transform: translateX(5px);
+  transition: opacity 0.35s, transform 0.35s;
+}
+#soundBtn:hover .sound-label { opacity: 1; transform: translateX(0); }
+
+/* ---------- 回看小窗：约 1/4 屏宽，可拖动，无滤镜 ---------- */
+#camWrap {
+  position: fixed;
+  right: clamp(18px, 2.6vw, 40px);
+  bottom: clamp(18px, 3.6vh, 40px);
+  width: clamp(180px, 24vw, 320px);
+  aspect-ratio: 16 / 9;
+  z-index: 6;
+  border: 1px solid rgba(46, 41, 35, 0.55);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #2a2620;
+  cursor: grab;
+  touch-action: none;
+  box-shadow: 0 6px 18px rgba(46, 41, 35, 0.22);
+}
+#camWrap.dragging { cursor: grabbing; }
+#cam {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);       /* 镜像显示 */
+  display: block;
+  pointer-events: none;
+}
+#skel {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+#handTags {
+  position: absolute;
+  left: 0; right: 0; bottom: 4px;
+  display: flex; justify-content: space-between;
+  padding: 0 8px;
+  pointer-events: none;
+}
+.hand-tag {
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  color: #9e3b2c;            /* 朱砂红 */
+  opacity: 0.18;             /* 未检测到：低透明度 */
+  transition: opacity 0.2s ease;
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+.hand-tag.on { opacity: 1; } /* 检测到：亮起 */
+
+/* ---------- 短暂提示：顶部一行小字，几秒后淡出 ---------- */
+#toast {
+  position: fixed;
+  left: 50%; top: clamp(24px, 4.2vh, 52px);
+  transform: translate(-50%, -6px);
+  z-index: 4;
+  padding: 6px 15px;
+  font-size: 12px;
+  letter-spacing: 0.20em;
+  color: var(--ink-soft);
+  background: rgba(246, 240, 229, 0.58);
+  border-radius: 2px;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- 加载诊断：出错时的原样异常，正常不出现 ---------- */
+#errDetail {
+  position: fixed;
+  left: 50%; top: clamp(64px, 9vh, 96px);
+  transform: translateX(-50%);
+  z-index: 5;
+  max-width: min(70vw, 760px);
+  padding: 9px 14px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  letter-spacing: 0;
+  color: #8d3a2b;
+  background: rgba(248, 242, 232, 0.92);
+  border-left: 2px solid var(--cinnabar);
+  border-radius: 2px;
+  word-break: break-all;
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+
+/* ---------- 船说：当前船的知识卡 ---------- */
+#shipInfo {
+  position: fixed;
+  right: clamp(16px, 3vw, 48px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  width: min(86vw, 340px);
+  padding: 18px 20px 14px;
+  background: rgba(246, 240, 229, 0.94);
+  border: 1px solid rgba(96, 78, 52, 0.35);
+  border-top: 3px solid var(--cinnabar);
+  border-radius: 3px;
+  box-shadow: 0 10px 34px rgba(52, 40, 26, 0.18);
+  backdrop-filter: blur(2px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+#shipInfo.hidden { opacity: 0; transform: translateY(-50%) translateX(14px); pointer-events: none; }
+.shipinfo-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.shipinfo-seal {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  background: var(--cinnabar); color: #fdf6ec;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: 14px; line-height: 1.2; text-align: center;
+  border-radius: 2px; transform: rotate(-4deg);
+}
+.shipinfo-head h3 {
+  margin: 0; font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: 20px; color: #4a3a28; letter-spacing: 1px;
+}
+.shipinfo-head p {
+  margin: 2px 0 0; font-size: 11px; color: rgba(74, 58, 40, 0.72);
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+}
+#shipFacts { margin: 0; padding: 0; list-style: none; }
+#shipFacts li {
+  position: relative; padding-left: 14px;
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: 12.5px; line-height: 1.75; color: rgba(52, 40, 26, 0.88);
+  margin-bottom: 7px;
+}
+#shipFacts li::before {
+  content: ""; position: absolute; left: 0; top: 0.62em;
+  width: 5px; height: 5px; background: var(--cinnabar); border-radius: 50%;
+}
+.shipinfo-tip {
+  margin: 10px 0 0; font-size: 10px; color: rgba(74, 58, 40, 0.5);
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ---------- 进入页：说明只讲一次 ---------- */
+#gate {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; align-items: flex-end;
+  background:
+    radial-gradient(ellipse at 76% 30%, rgba(255, 231, 214, 0.30), transparent 58%),
+    radial-gradient(ellipse at 24% 96%, rgba(245, 220, 196, 0.22), transparent 55%),
+    linear-gradient(178deg, #f6f0e5 0%, #f1eadd 55%, #e9e1d1 100%);
+  background-color: var(--paper);
+  transition: opacity 0.9s ease;
+}
+#gate.hide { opacity: 0; pointer-events: none; }
+.gate-panel {
+  margin-left: clamp(28px, 9vw, 150px);
+  margin-bottom: clamp(34px, 11vh, 132px);
+  max-width: 620px;
+}
+.gate-logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: clamp(70px, 6.2vw, 96px);
+  height: clamp(70px, 6.2vw, 96px);
+  background: var(--cinnabar);
+  color: #f7eee2;
+  border-radius: 4px;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: clamp(28px, 2.5vw, 38px);
+  line-height: 1.1;
+  text-align: center;
+  box-shadow: 0 6px 22px rgba(120, 58, 40, 0.16), inset 0 0 0 1px rgba(255, 248, 238, 0.18);
+  transform: rotate(-1.5deg);
+  margin-bottom: 26px;
+}
+.gate-logo span { display: block; }
+.gate-overline {
+  font-size: 11px;
+  letter-spacing: 0.42em;
+  color: rgba(46, 41, 35, 0.50);
+  margin-bottom: 22px;
+}
+.gate-panel h2 {
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: clamp(38px, 4.1vw, 62px);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.gate-guide {
+  margin-top: 22px;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: clamp(15px, 1.05vw, 18px);
+  letter-spacing: 0.16em;
+  line-height: 1.9;
+  color: var(--ink-soft);
+}
+.gate-guide-alt { margin-top: 4px; font-size: clamp(13px, 0.88vw, 15px); color: var(--ink-faint); }
+#startBtn {
+  margin-top: clamp(30px, 4.6vh, 48px);
+  padding: 10px 2px 9px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 0.52em;
+  text-indent: 0.52em;
+  color: var(--ink);
+  cursor: pointer;
+  transition: color 0.35s, border-color 0.35s, letter-spacing 0.35s;
+}
+#startBtn:hover {
+  color: var(--cinnabar);
+  border-color: var(--cinnabar);
+  letter-spacing: 0.62em;
+}
+.gate-note {
+  margin-top: 30px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+}
+
+/* ---------- 开场揭幕：纸褪去 ---------- */
+#reveal { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+.reveal-veil {
+  position: absolute; inset: 0;
+  background: linear-gradient(178deg, #f5efe4 0%, #eee6d7 100%);
+  opacity: 1;
+  transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1) 0.15s;
+}
+#reveal.play .reveal-veil { opacity: 0; }
+#reveal.fade { opacity: 0; transition: opacity 0.4s ease; }
+
+/* ---------- 演示模式：花、标题、季节花名、花语、印章之外，一律不出现 ---------- */
+body.demo #soundCtl,
+body.demo #camWrap,
+body.demo #toast,
+body.demo #errDetail { display: none !important; }
+body.demo #titleBlock {
+  transform: scale(1.12);
+  transform-origin: left bottom;
+}
+body.demo #inscription {
+  transform: translateY(-50%) scale(1.12);
+  transform-origin: right center;
+}
+
+/* ---------- 纸色过渡（D / Esc 切换时，不用黑场） ---------- */
+#blackout {
+  position: fixed; inset: 0; z-index: 20;
+  background: #f2ecdf;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+#blackout.on { opacity: 1; }
+
+/* ---------- 窄屏：仍然保持“花—标题—小字”的层级 ---------- */
+@media (max-width: 760px) {
+  #titleBlock {
+    left: 22px; bottom: 22px;
+    gap: 10px;
+  }
+  h1 { font-size: 34px; letter-spacing: 0.18em; margin-right: -0.18em; }
+  #inscription {
+    right: 18px; top: auto; bottom: 96px;
+    transform: none;
+    gap: 12px;
+  }
+  #flowerQuote { font-size: 16px; letter-spacing: 0.30em; }
+  #flowerNameZh { font-size: 22px; }
+  #soundCtl { right: 16px; top: 16px; bottom: auto; }
+  #camWrap { display: none; }
+  .gate-panel { margin-left: 24px; margin-bottom: 80px; }
+  .gate-panel h2 { font-size: 36px; }
+}
